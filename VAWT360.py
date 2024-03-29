@@ -39,31 +39,46 @@ class TurbineCommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
 
     def notify(self, args):
         try:
-            eventArgs = adsk.core.CommandCreatedEventArgs.cast(args)
-            cmd = eventArgs.command
-            inputs = cmd.commandInputs
+            cmd = adsk.core.CommandCreatedEventArgs.cast(args)
+            inputs = cmd.command.commandInputs
 
-            # Add inputs for turbine parameters
-            inputs.addValueInput('holeDiameter', 'Hole Diameter (mm)', 'mm', adsk.core.ValueInput.createByReal(3.0))
-            inputs.addValueInput('shaftDiameter', 'Shaft Diameter (mm)', 'mm', adsk.core.ValueInput.createByReal(4.0))
-            inputs.addValueInput('outerDiameter', 'Outer Diameter (mm)', 'mm', adsk.core.ValueInput.createByReal(12.0))
-            inputs.addValueInput('bladeThickness', 'Blade Thickness (mm)', 'mm', adsk.core.ValueInput.createByReal(0.5))
-            inputs.addValueInput('bladeDepth', 'Blade Depth (mm)', 'mm', adsk.core.ValueInput.createByReal(0.5))
-            inputs.addValueInput('turbineHeight', 'Turbine Height (mm)', 'mm', adsk.core.ValueInput.createByReal(20.0))
-            inputs.addIntegerSpinnerCommandInput('bladeCount', 'Blade Count', 1, 100, 1, 2)
-            inputs.addIntegerSpinnerCommandInput('twistCount', 'Twist Count', 1, 100, 1, 1)
+            # Create a new group for drag turbine parameters
+            dragTurbineParametersGroup = inputs.addGroupCommandInput('dragTurbineParameters', 'Drag Turbine Parameters')
+            dragTurbineParametersInputs = dragTurbineParametersGroup.children
+
+            dragTurbineParametersInputs.addValueInput('holeDiameter', 'Hole Diameter', 'in', adsk.core.ValueInput.createByString('1 in'))
+            dragTurbineParametersInputs.addValueInput('shaftDiameter', 'Shaft Diameter', 'in', adsk.core.ValueInput.createByString('1 in'))
+            dragTurbineParametersInputs.addValueInput('outerDiameter', 'Outer Diameter', 'in', adsk.core.ValueInput.createByString('10 in'))
+            dragTurbineParametersInputs.addValueInput('bladeThickness', 'Blade Thickness', 'in', adsk.core.ValueInput.createByString('0.125 in'))
+            dragTurbineParametersInputs.addValueInput('bladeDepth', 'Blade Depth', 'in', adsk.core.ValueInput.createByString('1 in'))
+            dragTurbineParametersInputs.addValueInput('turbineHeight', 'Turbine Height', 'in', adsk.core.ValueInput.createByString('10 in'))
+            dragTurbineParametersInputs.addIntegerSpinnerCommandInput('bladeCount', 'Blade Count', 1, 100, 1, 2)
+            dragTurbineParametersInputs.addIntegerSpinnerCommandInput('twistCount', 'Twist Count', 1, 100, 1, 1)
+
+            # Create a new group for airfoil turbine parameters
+            airfoilTurbineParametersGroup = inputs.addGroupCommandInput('airfoilTurbineParameters', 'Airfoil Turbine Parameters')
+            airfoilTurbineParametersInputs = airfoilTurbineParametersGroup.children
+
+            airfoilTurbineParametersInputs.addStringValueInput('nacaProfile', 'NACA Profile', ('0015'))
+            airfoilTurbineParametersInputs.addBoolValueInput('halfCosineSpacing', 'Half Cosine Spacing', True, '', True)
+            airfoilTurbineParametersInputs.addIntegerSpinnerCommandInput('numPoints', 'Number of Points', 1, 100, 1, (100))
+            airfoilTurbineParametersInputs.addBoolValueInput('finiteThicknessTE', 'Finite Thickness TE', True, '', False)
+            airfoilTurbineParametersInputs.addIntegerSpinnerCommandInput('airfoilCount', 'Airfoil Count', 1, 100, 1, 3)
+            airfoilTurbineParametersInputs.addValueInput('chordLength', 'Chord Length', 'in', adsk.core.ValueInput.createByString('3.0 in'))
+            airfoilTurbineParametersInputs.addValueInput('distanceFromCenter', 'Distance from Center', 'in', adsk.core.ValueInput.createByString('15.0 in'))
 
             # Connect to command related events
             onExecute = TurbineCommandExecuteHandler()
-            cmd.execute.add(onExecute)
+            cmd.command.execute.add(onExecute)
             _handlers.append(onExecute)
 
             onDestroy = TurbineCommandDestroyHandler()
-            cmd.destroy.add(onDestroy)
+            cmd.command.destroy.add(onDestroy)
             _handlers.append(onDestroy)
 
         except Exception as e:
             _ui.messageBox('Failed to create command: {}'.format(str(e)))
+
 
 class TurbineCommandExecuteHandler(adsk.core.CommandEventHandler):
     def __init__(self):
@@ -74,21 +89,35 @@ class TurbineCommandExecuteHandler(adsk.core.CommandEventHandler):
             eventArgs = adsk.core.CommandEventArgs.cast(args)
             inputs = eventArgs.command.commandInputs
 
+            # Retrieve the groups
+            dragTurbineParametersInputs = inputs.itemById('dragTurbineParameters').children
+            airfoilTurbineParametersInputs = inputs.itemById('airfoilTurbineParameters').children
+
             # Retrieve and cast the input values to float for precision
-            holeDiameter = float(inputs.itemById('holeDiameter').value)
-            shaftDiameter = float(inputs.itemById('shaftDiameter').value)
-            outerDiameter = float(inputs.itemById('outerDiameter').value)
-            bladeThickness = float(inputs.itemById('bladeThickness').value)
-            bladeDepth = float(inputs.itemById('bladeDepth').value)
-            turbineHeight = float(inputs.itemById('turbineHeight').value)
-            bladeCount = int(inputs.itemById('bladeCount').value)  # Blade count is an integer
-            twistCount = int (inputs.itemById('twistCount').value)
+            holeDiameter = float(dragTurbineParametersInputs.itemById('holeDiameter').value)
+            shaftDiameter = float(dragTurbineParametersInputs.itemById('shaftDiameter').value)
+            outerDiameter = float(dragTurbineParametersInputs.itemById('outerDiameter').value)
+            bladeThickness = float(dragTurbineParametersInputs.itemById('bladeThickness').value)
+            bladeDepth = float(dragTurbineParametersInputs.itemById('bladeDepth').value)
+            turbineHeight = float(dragTurbineParametersInputs.itemById('turbineHeight').value)
+            bladeCount = int(dragTurbineParametersInputs.itemById('bladeCount').value)  # Blade count is an integer
+
+            # Retrieve and cast the airfoil parameters
+            nacaProfile = airfoilTurbineParametersInputs.itemById('nacaProfile').value
+            halfCosineSpacing = airfoilTurbineParametersInputs.itemById('halfCosineSpacing').value
+            numPoints = int(airfoilTurbineParametersInputs.itemById('numPoints').value)
+            finiteThicknessTE = airfoilTurbineParametersInputs.itemById('finiteThicknessTE').value
+            airfoilCount = int(airfoilTurbineParametersInputs.itemById('airfoilCount').value)
+            chordLength = float(airfoilTurbineParametersInputs.itemById('chordLength').value)
+            distanceFromCenter = float(airfoilTurbineParametersInputs.itemById('distanceFromCenter').value)
+            twistCount = int(dragTurbineParametersInputs.itemById('twistCount').value)  # Twist count is an integer
 
             # Create the turbine components
-            createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bladeDepth, turbineHeight, bladeCount, twistCount)
+            createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bladeDepth, turbineHeight, bladeCount, twistCount, nacaProfile, halfCosineSpacing, numPoints, finiteThicknessTE, chordLength, distanceFromCenter, airfoilCount)
         except:
             if _ui:
                 _ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+
 
 class TurbineCommandDestroyHandler(adsk.core.CommandEventHandler):
     def __init__(self):
@@ -97,7 +126,7 @@ class TurbineCommandDestroyHandler(adsk.core.CommandEventHandler):
     def notify(self, args):
         adsk.terminate()
 
-def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bladeDepth, turbineHeight, bladeCount, twistCount):
+def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bladeDepth, turbineHeight, bladeCount, twistCount, nacaProfile, halfCosineSpacing, numPoints, finiteThicknessTE, chordLength, distanceFromCenter, airfoilCount):
     try:
         app = adsk.core.Application.get()
         design = app.activeProduct
@@ -245,6 +274,130 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
         circularPatternInput.quantity = adsk.core.ValueInput.createByReal(bladeCount)
         circularPatternInput.totalAngle = adsk.core.ValueInput.createByString('360 deg')  # Full circle
         circularPattern = circularPatterns.add(circularPatternInput)
+
+        def naca4(number, n, finite_TE, half_cosine_spacing):
+            m = int(number[0]) / 100.0  # Maximum camber
+            p = int(number[1]) / 10.0   # Location of maximum camber
+            t = int(number[2:]) / 100.0 # Maximum thickness
+    
+            # Define the thickness distribution function (same as before)
+            def thickness(x):
+                a0 = 0.2969
+                a1 = -0.126
+                a2 = -0.3516
+                a3 = 0.2843
+                a4 = -0.1015 if finite_TE else -0.1036  # Adjust for finite thickness at trailing edge
+        
+                return 5 * t * (a0 * math.sqrt(x) + a1 * x + a2 * x**2 + a3 * x**3 + a4 * x**4)
+    
+            # Define a function to calculate the camber line and its slope
+            def camber_line(x):
+                if x < p:
+                    return m / p**2 * (2 * p * x - x**2)
+                elif x == p:
+                    return m
+                else:
+                    return m / (1 - p)**2 * ((1 - 2*p) + 2*p*x - x**2)
+    
+            def camber_slope(x):
+                if x < p:
+                    return (2*m / p**2) * (p - x)
+                else:
+                    return (2*m / (1 - p)**2) * (p - x)
+    
+            # Generate the x coordinates
+            x = [i / n for i in range(n + 1)] if not half_cosine_spacing else [0.5 * (1 - math.cos(math.pi * i / n)) for i in range(n + 1)]
+    
+            # Calculate the camber line and its slope for each x
+            yc = [camber_line(xi) for xi in x]
+            dyc_dx = [camber_slope(xi) for xi in x]
+            theta = [math.atan(dy) for dy in dyc_dx]
+    
+            # Calculate the thickness distribution for each x
+            yt = [thickness(xi) for xi in x]
+    
+            # Calculate upper and lower surface points
+            xu = [xi - yt[i] * math.sin(theta[i]) for i, xi in enumerate(x)]
+            yu = [yc[i] + yt[i] * math.cos(theta[i]) for i in range(len(x))]
+            xl = [xi + yt[i] * math.sin(theta[i]) for i, xi in enumerate(x)]
+            yl = [yc[i] - yt[i] * math.cos(theta[i]) for i in range(len(x))]
+    
+            # Combine the upper and lower points
+            X = xu + xl[::-1]
+            Y = yu + yl[::-1]
+    
+            return X, Y
+
+        # Method to Create Airfoil Sketch
+        def createNacaAirfoil(nacaProfile, halfCosineSpacing, numPoints, finiteThicknessTE, chordLength, distanceFromCenter, turbineHeight, airfoilCount):
+            app = adsk.core.Application.get()
+            ui = app.userInterface
+            design = app.activeProduct
+            rootComp = design.rootComponent
+            xzPlane = rootComp.xZConstructionPlane
+
+            # Generate NACA airfoil points
+            X, Z = naca4(nacaProfile, int(numPoints), finiteThicknessTE, halfCosineSpacing)
+
+            # Adjust points based on chord length, center the airfoil, and position it for clockwise rotation
+            points = []
+            for x, z in zip(X, Z):
+                # Flip the airfoil by reversing the x-coordinate around its central axis (chord/2)
+                x_flipped = (chordLength / 2) - (x * chordLength - (chordLength / 2))
+                z_shifted = turbineHeight / 2  # Position the airfoil at half the turbineHeight
+                y_height = distanceFromCenter + (z * chordLength)  # Shift along the Y-axis for distanceFromCenter
+                points.append(adsk.core.Point3D.create(x_flipped, y_height, z_shifted))
+
+            # Create the sketch and connect points with lines
+            sketches = rootComp.sketches
+            sketch = sketches.add(xzPlane)
+            # Here we ensure the points are connected in their original order to maintain the profile shape
+            for i in range(len(points) - 1):
+                sketch.sketchCurves.sketchLines.addByTwoPoints(points[i], points[i + 1])
+
+            # Optionally, close the loop, connecting the last point back to the first
+            sketch.sketchCurves.sketchLines.addByTwoPoints(points[-1], points[0])
+
+            # Extrude the airfoil profile symmetrically
+            extrudeDistance = (0.5 * turbineHeight + 1)  # Extrusion distance in mm
+            profiles = sketch.profiles
+            if profiles.count > 0:
+                profileToExtrude = profiles.item(0)  # Assuming the airfoil profile is the only one in the sketch
+
+                # Get the extrude features collection
+                extrudes = rootComp.features.extrudeFeatures
+
+                # Create an extrusion input to add to the collection
+                extrudeInput = extrudes.createInput(profileToExtrude, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+        
+                # Set the extrusion distance symmetrically
+                distance = adsk.core.ValueInput.createByString(f'{extrudeDistance} in')  # Half distance for symmetric extrusion
+                extrudeInput.setSymmetricExtent(distance, True)
+        
+                # Create the extrusion
+                extrudeFeature = extrudes.add(extrudeInput)
+
+                # Assume extrudeFeature is the last created extrusion
+            extrudeFeature = rootComp.features.extrudeFeatures.item(rootComp.features.extrudeFeatures.count - 1)
+
+            # Create an ObjectCollection for the body/bodies produced by the extrusion
+            bodiesCollection = adsk.core.ObjectCollection.create()
+            for body in extrudeFeature.bodies:
+                bodiesCollection.add(body)
+
+            yAxis = newComp.yConyAxis = design.rootComponent.yConstructionAxis
+
+            # Create the circular pattern
+            circularPatterns = rootComp.features.circularPatternFeatures
+            patternInput = circularPatterns.createInput(bodiesCollection, yAxis)
+            patternInput.quantity = adsk.core.ValueInput.createByReal(airfoilCount)
+            patternInput.totalAngle = adsk.core.ValueInput.createByString('360 deg')  # Distribute around a full circle
+            patternInput.isSymmetric = False  # Adjust if your design requires symmetric distribution
+
+            # Create the pattern
+            circularPatternFeature = circularPatterns.add(patternInput)
+
+        createNacaAirfoil(nacaProfile, halfCosineSpacing, numPoints, finiteThicknessTE, chordLength, distanceFromCenter, turbineHeight, airfoilCount)
       
     except Exception as e:
         ui = adsk.core.Application.get().userInterface

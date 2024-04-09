@@ -139,8 +139,6 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
         # Create circles
         centerPoint = adsk.core.Point3D.create(0, 0, 0)
         shaftCircle = sketchbbase.sketchCurves.sketchCircles.addByCenterRadius(centerPoint, shaftDiameter / 2.0)
-        # Existing circle creation for hole
-        holeCircle = sketchbbase.sketchCurves.sketchCircles.addByCenterRadius(centerPoint, holeDiameter / 2.0)
 
         # Calculate hexagon vertices and create an inscribed hexagon
         radius = holeDiameter / 2.0
@@ -163,46 +161,11 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
             end_point = hexagonPoints[(i + 1) % 6]  # Wrap around to the first point after the last
             sketchbbase.sketchCurves.sketchLines.addByTwoPoints(start_point, end_point)
 
-       # Re-define the function to check if a profile is likely one of the six small profiles
-        def is_small_hexagon_profile(profile, holeRadius):
-            # Define the threshold as before
-            area_threshold = math.pi * (holeRadius ** 2) / 6
-            centroid = profile.areaProperties().centroid
-            distance_from_center = math.sqrt(centroid.x**2 + centroid.y**2)
-            return profile.areaProperties().area < area_threshold and distance_from_center < holeRadius
-
-        # Initialize collection to hold profiles for extrusion
-        profilesToExtrude = adsk.core.ObjectCollection.create()
-        holeRadius = holeDiameter / 2.0
-        shaftRadius = shaftDiameter / 2.0
-
-        # First, add the disk profile between holeCircle and shaftCircle
-        for profile in sketchbbase.profiles:
-            # This check assumes the profiles that are not small hexagon segments but are within the shaft circle
-            # could include the desired disk profile. We distinguish it by not being one of the small profiles
-            # and by being encircled by the shaft radius.
-            centroid = profile.areaProperties().centroid
-            distance_from_center = math.sqrt(centroid.x**2 + centroid.y**2)
-            if distance_from_center < shaftRadius and not is_small_hexagon_profile(profile, holeRadius):
-                profilesToExtrude.add(profile)
-                break  # Assuming only one such profile exists, we break after adding it
-
-        # Then, add the six small profiles between the hexagon and the holeCircle
-        for profile in sketchbbase.profiles:
-            if is_small_hexagon_profile(profile, holeRadius):
-                profilesToExtrude.add(profile)
-
-        # Verify the expected number of profiles are selected
-        if profilesToExtrude.count != 7:
-            _ui.messageBox('Unexpected number of profiles selected for extrusion. Expected 7, found {}.'.format(profilesToExtrude.count))
-            return
-
-        # Perform the extrusion with the selected profiles
         extrudes = newComp.features.extrudeFeatures
-        for profile in profilesToExtrude:
-            extrudeInput = extrudes.createInput(profile, adsk.fusion.FeatureOperations.JoinFeatureOperation)
-            extrudeInput.setDistanceExtent(False, adsk.core.ValueInput.createByReal(turbineHeight))
-            extrude = extrudes.add(extrudeInput)
+        shaftprofile = sketchbbase.profiles.item(0)
+        extrudeInput = extrudes.createInput(shaftprofile, adsk.fusion.FeatureOperations.JoinFeatureOperation)
+        extrudeInput.setDistanceExtent(False, adsk.core.ValueInput.createByReal(turbineHeight))
+        extrude = extrudes.add(extrudeInput)
 
         arcPoint = adsk.core.Point3D.create((-(((((outerDiameter / 4.0) ** 2) / bladeDepth) + bladeDepth) / 2.0) + bladeDepth), (outerDiameter / 4.0), 0)
         sweepAngle = 2 * math.asin(outerDiameter / ((2 * ((outerDiameter / 4.0) ** 2) / bladeDepth) + bladeDepth))
@@ -239,7 +202,7 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
 
         # Step 1: Identify the profile formed by the two arcs and connecting line
         # This step is conceptual; you need to identify the correct profile in your sketch
-        profileToSweep = sketchbbase.profiles.item(7)  # Example: Selecting the first profile
+        profileToSweep = sketchbbase.profiles.item(0)  # Example: Selecting the first profile
         
         # Step 2: Create the path for the sweep
         # Assuming 'sketchXY' contains the vertical line for the path

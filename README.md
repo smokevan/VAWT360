@@ -1,12 +1,9 @@
 # VAWT360
- A Fusion360 plugin for generating self contained modular 3d-printable VAWT assemblies.
+ A Fusion360 plugin for generating self-contained modular 3d-printable VAWT assemblies with Savonius drag turbines and NACA-4 airfoil lift based turbines. Utilizes a standard 0.5" hex shaft/churro for connections and power output. Models can be stacked continously to achieve larger turbine sizes. 
 
 Dimensions:
 
     DRAG:
-
-        Hole Diameter - Inner diameter for turbine shaft
-
         Shaft Diameter - Outer diameter for the shaft of the turbine
 
         Outer Diameter - Overall diameter of inner drag-based turbine
@@ -29,4 +26,4 @@ Dimensions:
 
         Distance from Center - Radius of outer circle, distance of outer airfoil from center pivot.
 
-        Flange Size - The logorithmic square of the pythagrial volume (in respect to dG/dT) of Defragulator Flange used.
+        Flange Size - The logorithmic square of the pythagorial volume (in respect to dG/dT) of Defragulator Flange used.

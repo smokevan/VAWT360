@@ -45,8 +45,6 @@ class TurbineCommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
             # Create a new group for drag turbine parameters
             dragTurbineParametersGroup = inputs.addGroupCommandInput('dragTurbineParameters', 'Drag Turbine Parameters')
             dragTurbineParametersInputs = dragTurbineParametersGroup.children
-
-            dragTurbineParametersInputs.addValueInput('holeDiameter', 'Hole Diameter', 'in', adsk.core.ValueInput.createByString('1 in'))
             dragTurbineParametersInputs.addValueInput('shaftDiameter', 'Shaft Diameter', 'in', adsk.core.ValueInput.createByString('1 in'))
             dragTurbineParametersInputs.addValueInput('outerDiameter', 'Outer Diameter', 'in', adsk.core.ValueInput.createByString('10 in'))
             dragTurbineParametersInputs.addValueInput('bladeThickness', 'Blade Thickness', 'in', adsk.core.ValueInput.createByString('0.125 in'))
@@ -60,9 +58,6 @@ class TurbineCommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
             airfoilTurbineParametersInputs = airfoilTurbineParametersGroup.children
 
             airfoilTurbineParametersInputs.addStringValueInput('nacaProfile', 'NACA Profile', ('0015'))
-            airfoilTurbineParametersInputs.addBoolValueInput('halfCosineSpacing', 'Half Cosine Spacing', True, '', True)
-            airfoilTurbineParametersInputs.addIntegerSpinnerCommandInput('numPoints', 'Number of Points', 1, 100, 1, (100))
-            airfoilTurbineParametersInputs.addBoolValueInput('finiteThicknessTE', 'Finite Thickness TE', True, '', False)
             airfoilTurbineParametersInputs.addIntegerSpinnerCommandInput('airfoilCount', 'Airfoil Count', 1, 100, 1, 3)
             airfoilTurbineParametersInputs.addValueInput('chordLength', 'Chord Length', 'in', adsk.core.ValueInput.createByString('3.0 in'))
             airfoilTurbineParametersInputs.addValueInput('distanceFromCenter', 'Distance from Center', 'in', adsk.core.ValueInput.createByString('15.0 in'))
@@ -94,7 +89,7 @@ class TurbineCommandExecuteHandler(adsk.core.CommandEventHandler):
             airfoilTurbineParametersInputs = inputs.itemById('airfoilTurbineParameters').children
 
             # Retrieve and cast the input values to float for precision
-            holeDiameter = float(dragTurbineParametersInputs.itemById('holeDiameter').value)
+            holeDiameter = float(0.0575*25.4)
             shaftDiameter = float(dragTurbineParametersInputs.itemById('shaftDiameter').value)
             outerDiameter = float(dragTurbineParametersInputs.itemById('outerDiameter').value)
             bladeThickness = float(dragTurbineParametersInputs.itemById('bladeThickness').value)
@@ -104,9 +99,9 @@ class TurbineCommandExecuteHandler(adsk.core.CommandEventHandler):
 
             # Retrieve and cast the airfoil parameters
             nacaProfile = airfoilTurbineParametersInputs.itemById('nacaProfile').value
-            halfCosineSpacing = airfoilTurbineParametersInputs.itemById('halfCosineSpacing').value
-            numPoints = int(airfoilTurbineParametersInputs.itemById('numPoints').value)
-            finiteThicknessTE = airfoilTurbineParametersInputs.itemById('finiteThicknessTE').value
+            halfCosineSpacing = True
+            numPoints = int(100)
+            finiteThicknessTE = False
             airfoilCount = int(airfoilTurbineParametersInputs.itemById('airfoilCount').value)
             chordLength = float(airfoilTurbineParametersInputs.itemById('chordLength').value)
             distanceFromCenter = float(airfoilTurbineParametersInputs.itemById('distanceFromCenter').value)
@@ -133,20 +128,19 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
         rootComp = design.rootComponent
         occs = rootComp.occurrences
         newOcc = occs.addNewComponent(adsk.core.Matrix3D.create())
-        newComp = newOcc.component  
+        newComp = newOcc.component 
+        newComp.name = "DragTurbine" 
         # Now, use 'newComp' for all operations, like sketches, extrusions, etc.
         # For example, creating a sketch in the new component context
         sketches = newComp.sketches
         xzPlane = newComp.xZConstructionPlane
-        sketch = sketches.add(xzPlane)
+        sketchbbase = sketches.add(xzPlane)
 
         # Create circles
         centerPoint = adsk.core.Point3D.create(0, 0, 0)
-        holeCircle = sketch.sketchCurves.sketchCircles.addByCenterRadius(centerPoint, holeDiameter / 2.0)
-        shaftCircle = sketch.sketchCurves.sketchCircles.addByCenterRadius(centerPoint, shaftDiameter / 2.0)
-
+        shaftCircle = sketchbbase.sketchCurves.sketchCircles.addByCenterRadius(centerPoint, shaftDiameter / 2.0)
         # Existing circle creation for hole
-        holeCircle = sketch.sketchCurves.sketchCircles.addByCenterRadius(centerPoint, holeDiameter / 2.0)
+        holeCircle = sketchbbase.sketchCurves.sketchCircles.addByCenterRadius(centerPoint, holeDiameter / 2.0)
 
         # Calculate hexagon vertices and create an inscribed hexagon
         radius = holeDiameter / 2.0
@@ -159,7 +153,7 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
             hexagonPoints.append(adsk.core.Point3D.create(x, y, 0))
 
         # Add sketch points for hexagon vertices
-        sketchPoints = sketch.sketchPoints
+        sketchPoints = sketchbbase.sketchPoints
         for point in hexagonPoints:
             sketchPoints.add(point)
 
@@ -167,7 +161,7 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
         for i in range(6):
             start_point = hexagonPoints[i]
             end_point = hexagonPoints[(i + 1) % 6]  # Wrap around to the first point after the last
-            sketch.sketchCurves.sketchLines.addByTwoPoints(start_point, end_point)
+            sketchbbase.sketchCurves.sketchLines.addByTwoPoints(start_point, end_point)
 
        # Re-define the function to check if a profile is likely one of the six small profiles
         def is_small_hexagon_profile(profile, holeRadius):
@@ -183,7 +177,7 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
         shaftRadius = shaftDiameter / 2.0
 
         # First, add the disk profile between holeCircle and shaftCircle
-        for profile in sketch.profiles:
+        for profile in sketchbbase.profiles:
             # This check assumes the profiles that are not small hexagon segments but are within the shaft circle
             # could include the desired disk profile. We distinguish it by not being one of the small profiles
             # and by being encircled by the shaft radius.
@@ -194,7 +188,7 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
                 break  # Assuming only one such profile exists, we break after adding it
 
         # Then, add the six small profiles between the hexagon and the holeCircle
-        for profile in sketch.profiles:
+        for profile in sketchbbase.profiles:
             if is_small_hexagon_profile(profile, holeRadius):
                 profilesToExtrude.add(profile)
 
@@ -212,21 +206,21 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
 
         arcPoint = adsk.core.Point3D.create((-(((((outerDiameter / 4.0) ** 2) / bladeDepth) + bladeDepth) / 2.0) + bladeDepth), (outerDiameter / 4.0), 0)
         sweepAngle = 2 * math.asin(outerDiameter / ((2 * ((outerDiameter / 4.0) ** 2) / bladeDepth) + bladeDepth))
-        arc = sketch.sketchCurves.sketchArcs.addByCenterStartSweep(arcPoint, centerPoint, sweepAngle)
+        arc = sketchbbase.sketchCurves.sketchArcs.addByCenterStartSweep(arcPoint, centerPoint, sweepAngle)
 
         # Define the offset using BladeThickness
         offsetValue = adsk.core.ValueInput.createByReal(-bladeThickness)
         basePoint = arc.startSketchPoint.geometry  # Using the start point of the arc for the base point
 
         # Add the offset constraint to create offset arc
-        geometricConstraints = sketch.geometricConstraints
+        geometricConstraints = sketchbbase.geometricConstraints
         offsetConstraint = geometricConstraints.addOffset([arc], offsetValue, basePoint)
 
         if offsetConstraint and offsetConstraint.childCurves:
             offsetArc = offsetConstraint.childCurves[0]  # Assuming the first curve is the offset arc
 
             # Connect the end points of the original and the offset arc with a line
-            sketch.sketchCurves.sketchLines.addByTwoPoints(arc.endSketchPoint, offsetArc.endSketchPoint)
+            sketchbbase.sketchCurves.sketchLines.addByTwoPoints(arc.endSketchPoint, offsetArc.endSketchPoint)
 
         # Create a sketch on the XY plane for the vertical line
         sketchesXY = newComp.sketches
@@ -240,12 +234,12 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
         # Add the vertical line to the sketch
         sketchXY.sketchCurves.sketchLines.addByTwoPoints(startPoint, endPoint)
 
-                # Assume 'sketch' is already defined and contains your arcs and connecting line
+        # Assume 'sketch' is already defined and contains your arcs and connecting line
         # Assume 'sketchXY' contains the vertical line for the sweep path
 
         # Step 1: Identify the profile formed by the two arcs and connecting line
         # This step is conceptual; you need to identify the correct profile in your sketch
-        profileToSweep = sketch.profiles.item(7)  # Example: Selecting the first profile
+        profileToSweep = sketchbbase.profiles.item(7)  # Example: Selecting the first profile
         
         # Step 2: Create the path for the sweep
         # Assuming 'sketchXY' contains the vertical line for the path
@@ -335,37 +329,43 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
             design = app.activeProduct
             rootComp = design.rootComponent
             xzPlane = rootComp.xZConstructionPlane
+            xyPlane = rootComp.xYConstructionPlane
+
+            airfoilComp = rootComp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+            airfoilComp.component.name = "Airfoils"
 
             # Generate NACA airfoil points
             X, Z = naca4(nacaProfile, int(numPoints), finiteThicknessTE, halfCosineSpacing)
 
             # Adjust points based on chord length, center the airfoil, and position it for clockwise rotation
+                        # Adjust points based on chord length, center the airfoil, and position it for clockwise rotation
             points = []
             for x, z in zip(X, Z):
                 # Flip the airfoil by reversing the x-coordinate around its central axis (chord/2)
                 x_flipped = (chordLength / 2) - (x * chordLength - (chordLength / 2))
+                x_flipped -= chordLength / 2  # Shift along the x-axis by half the chord length
                 z_shifted = turbineHeight / 2  # Position the airfoil at half the turbineHeight
-                y_height = distanceFromCenter + (z * chordLength)  # Shift along the Y-axis for distanceFromCenter
+                y_height = z * chordLength  #  Shift along the Y-axis for distanceFromCenter
                 points.append(adsk.core.Point3D.create(x_flipped, y_height, z_shifted))
 
             # Create the sketch and connect points with lines
-            sketches = rootComp.sketches
-            sketch = sketches.add(xzPlane)
+            sketches = airfoilComp.component.sketches
+            sketchfoil = sketches.add(xzPlane)
             # Here we ensure the points are connected in their original order to maintain the profile shape
             for i in range(len(points) - 1):
-                sketch.sketchCurves.sketchLines.addByTwoPoints(points[i], points[i + 1])
+                sketchfoil.sketchCurves.sketchLines.addByTwoPoints(points[i], points[i + 1])
 
             # Optionally, close the loop, connecting the last point back to the first
-            sketch.sketchCurves.sketchLines.addByTwoPoints(points[-1], points[0])
+            sketchfoil.sketchCurves.sketchLines.addByTwoPoints(points[-1], points[0])
 
             # Extrude the airfoil profile symmetrically
-            extrudeDistance = (0.5 * turbineHeight + 1)  # Extrusion distance in mm
-            profiles = sketch.profiles
+            extrudeDistance = ((0.5*turbineHeight)+0.3)
+            profiles = sketchfoil.profiles
             if profiles.count > 0:
                 profileToExtrude = profiles.item(0)  # Assuming the airfoil profile is the only one in the sketch
 
                 # Get the extrude features collection
-                extrudes = rootComp.features.extrudeFeatures
+                extrudes = airfoilComp.component.features.extrudeFeatures
 
                 # Create an extrusion input to add to the collection
                 extrudeInput = extrudes.createInput(profileToExtrude, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
@@ -374,21 +374,129 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
                 distance = adsk.core.ValueInput.createByString(f'{extrudeDistance} in')  # Half distance for symmetric extrusion
                 extrudeInput.setSymmetricExtent(distance, True)
         
-                # Create the extrusion
-                extrudeFeature = extrudes.add(extrudeInput)
+            # Create the extrusion
+            extrudeFeature = extrudes.add(extrudeInput)
 
-                # Assume extrudeFeature is the last created extrusion
-            extrudeFeature = rootComp.features.extrudeFeatures.item(rootComp.features.extrudeFeatures.count - 1)
+            sketchbCone = sketches.add(xyPlane)
+            sketchtCone = sketches.add(xyPlane)
+            bCircleRad = 0.05*25.4  # Radius in inches
+            tCircleRad = 0.0375*25.4  # Radius in inches
+            bPointBottom = adsk.core.Point3D.create(0, -0.05*25.4, 0)  # Convert -0.5 inches to millimeters
+            tPointBottom = adsk.core.Point3D.create(0, (turbineHeight+(0.05*25.4)), 0)  # Convert (turbineHeight + 0.5) inches to millimeters
+
+            tConeBottom = sketchtCone.sketchCurves.sketchCircles.addByCenterRadius(tPointBottom, bCircleRad)
+            bConeBottom = sketchbCone.sketchCurves.sketchCircles.addByCenterRadius(bPointBottom, bCircleRad)
+
+            def calculate_thickness(x, number, finite_TE):
+                t = int(number[2:]) / 100.0  # Maximum thickness
+
+                a0 = 0.2969
+                a1 = -0.126
+                a2 = -0.3516
+                a3 = 0.2843
+                a4 = -0.1015 if finite_TE else -0.1036  # Adjust for finite thickness at trailing edge
+
+                return 5 * t * (a0 * math.sqrt(x) + a1 * x + a2 * x**2 + a3 * x**3 + a4 * x**4)
+            
+            z_dist = calculate_thickness(0.5, nacaProfile, finiteThicknessTE)
+            
+            bPointTop = adsk.core.Point3D.create(0, -0.05*25.4, (z_dist*chordLength)+(0.0125*25.4))
+            tPointTop = adsk.core.Point3D.create(0, (turbineHeight+(0.05*25.4)), (z_dist*chordLength)+(0.0125*25.4))
+            
+            bConeTop = sketchbCone.sketchCurves.sketchCircles.addByCenterRadius(bPointTop, tCircleRad)
+            tConeTop = sketchtCone.sketchCurves.sketchCircles.addByCenterRadius(tPointTop, tCircleRad)
+
+            # Create a new loft feature
+            loftFeatures = airfoilComp.component.features.loftFeatures
+
+            # Create a new loft input for sketchbCone
+            loftInputB = loftFeatures.createInput(adsk.fusion.FeatureOperations.JoinFeatureOperation)
+
+            # Add the two circles in sketchbCone to the loft input
+            loftInputB.loftSections.add(sketchbCone.profiles.item(0))
+            loftInputB.loftSections.add(sketchbCone.profiles.item(1))
+
+            # Create the loft feature for sketchbCone
+            loftFeatureB = loftFeatures.add(loftInputB)
+
+            # Create a new loft input for sketchtCone
+            loftInputT = loftFeatures.createInput(adsk.fusion.FeatureOperations.JoinFeatureOperation)
+
+            # Add the two circles in sketchtCone to the loft input
+            loftInputT.loftSections.add(sketchtCone.profiles.item(0))
+            loftInputT.loftSections.add(sketchtCone.profiles.item(1))
+
+            # Create the loft feature for sketchtCone
+            loftFeatureT = loftFeatures.add(loftInputT)
+
+            def coneHexHole(sketchName, z_dist, chordLength, y_shift):
+                hexagonPoints = []
+                for i in range(6):
+                    angle_deg = 60 * i - 30  # -30 to start the first point at the top
+                    angle_rad = math.radians(angle_deg)
+                    x = centerPoint.x + radius * math.cos(angle_rad)
+                    y = centerPoint.y + radius * math.sin(angle_rad)
+                    hexagonPoints.append(adsk.core.Point3D.create(x, y+y_shift, (z_dist*chordLength)+(0.0125*25.4)))
+
+                # Add sketch points for hexagon vertices
+                sketchPoints = sketchName.sketchPoints
+                for point in hexagonPoints:
+                    sketchPoints.add(point)
+
+                # Connect the hexagon points with lines
+                for i in range(6):
+                    start_point = hexagonPoints[i]
+                    end_point = hexagonPoints[(i + 1) % 6]  # Wrap around to the first point after the last
+                    sketchName.sketchCurves.sketchLines.addByTwoPoints(start_point, end_point)
+            
+            coneHexHole(sketchbCone, z_dist, chordLength, -0.05*25.4)
+            coneHexHole(sketchtCone, z_dist, chordLength, (turbineHeight+(0.05*25.4)))
+
+            # Get the extrude features collection
+            extrudeFeatures = airfoilComp.component.features.extrudeFeatures
+
+            # Define the distance for the extrusion
+            distance = adsk.core.ValueInput.createByReal(-z_dist-(0.025*25.4))
+
+            # Create an extrusion input for each sketch
+            for sketch in [sketchbCone, sketchtCone]:
+                # Get the profile defined by the hexagon
+                profile = sketch.profiles.item(1)
+
+                # Create an extrusion input
+                extrudeInput = extrudeFeatures.createInput(profile, adsk.fusion.FeatureOperations.CutFeatureOperation)
+
+                # Set the distance for the extrusion
+                extrudeInput.setDistanceExtent(False, distance)
+
+                # Create the extrusion
+                extrudeFeature = extrudeFeatures.add(extrudeInput)
+
+            # Assume extrudeFeature is the last created extrusion
+            extrudeFeature = airfoilComp.component.features.extrudeFeatures.item(airfoilComp.component.features.extrudeFeatures.count - 1)
 
             # Create an ObjectCollection for the body/bodies produced by the extrusion
             bodiesCollection = adsk.core.ObjectCollection.create()
+
             for body in extrudeFeature.bodies:
                 bodiesCollection.add(body)
+            
+            for body in loftFeatureB.bodies:
+                bodiesCollection.add(body)
 
-            yAxis = newComp.yConyAxis = design.rootComponent.yConstructionAxis
+            for body in loftFeatureT.bodies:
+                bodiesCollection.add(body)
+
+            yAxis = airfoilComp.component.yConstructionAxis
+
+            transform = adsk.core.Matrix3D.create()
+            transform.translation = adsk.core.Vector3D.create(0, 0, -distanceFromCenter)
+            moveFeatures = airfoilComp.component.features.moveFeatures
+            moveInput = moveFeatures.createInput(bodiesCollection, transform)
+            moveFeatures.add(moveInput)
 
             # Create the circular pattern
-            circularPatterns = rootComp.features.circularPatternFeatures
+            circularPatterns = airfoilComp.component.features.circularPatternFeatures
             patternInput = circularPatterns.createInput(bodiesCollection, yAxis)
             patternInput.quantity = adsk.core.ValueInput.createByReal(airfoilCount)
             patternInput.totalAngle = adsk.core.ValueInput.createByString('360 deg')  # Distribute around a full circle
@@ -398,6 +506,225 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
             circularPatternFeature = circularPatterns.add(patternInput)
 
         createNacaAirfoil(nacaProfile, halfCosineSpacing, numPoints, finiteThicknessTE, chordLength, distanceFromCenter, turbineHeight, airfoilCount)
+
+        def create_connectors(connectorDiameter, turbineHeight, airfoilCount):
+            
+            def create_bottom_connector(connectorDiameter, airfoilCount):
+                # Get the active product
+                product = adsk.core.Application.get().activeProduct
+                # Get the root component of the active design.
+                rootComp = product.rootComponent
+                xzPlane = rootComp.xZConstructionPlane
+                yzPlane = rootComp.yZConstructionPlane
+                bconnectorComp = rootComp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+                bconnectorComp.component.name = "BottomConnector"
+                # Create a new sketch on the xz plane.
+                sketches = bconnectorComp.component.sketches
+                sketchbbase = sketches.add(xzPlane)
+
+                hexdia = 0.0575*25.4
+                y_shift = -0.05*25.4
+
+                hexagonPoints = []
+                for i in range(6):
+                    angle_deg = 60 * i - 30  # -30 to start the first point at the top
+                    angle_rad = math.radians(angle_deg)
+                    x = centerPoint.x + (hexdia/2) * math.cos(angle_rad)
+                    y = centerPoint.y + (hexdia/2) * math.sin(angle_rad)
+                    hexagonPoints.append(adsk.core.Point3D.create(x, y, 0))
+
+                # Add sketch points for hexagon vertices
+                sketchPoints = sketchbbase.sketchPoints
+                
+                for point in hexagonPoints:
+                    sketchPoints.add(point)
+
+                # Connect the hexagon points with lines
+                for i in range(6):
+                    start_point = hexagonPoints[i]
+                    end_point = hexagonPoints[(i + 1) % 6]  # Wrap around to the first point after the last
+                    sketchbbase.sketchCurves.sketchLines.addByTwoPoints(start_point, end_point)
+
+                # Draw a circle with the specified diameter.
+                circles = sketchbbase.sketchCurves.sketchCircles
+                base = circles.addByCenterRadius(adsk.core.Point3D.create(0, 0, 0), connectorDiameter/2)
+                # Get the profile corresponding to the circle
+                profile = sketchbbase.profiles.item(1)  # Select the first profile
+                # Get extrude features
+                extrudes = bconnectorComp.component.features.extrudeFeatures
+                # Create an extrusion input
+                extInput = extrudes.createInput(profile, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+                # Define the distance for the extrusion
+                distance = adsk.core.ValueInput.createByString('-1 in')
+                # Set the distance extent to be single direction
+                extInput.setDistanceExtent(False, distance)
+                # Create the extrusion
+                extrudes.add(extInput)
+
+                sketchbhex = sketches.add(yzPlane)
+                hexagonPoints = []
+                for i in range(6):
+                    angle_deg = 60 * i - 30  # -30 to start the first point at the top
+                    angle_rad = math.radians(angle_deg)
+                    x = centerPoint.x + (hexdia/2) * math.sin(angle_rad)
+                    y = centerPoint.y + (hexdia/2) * math.cos(angle_rad)
+                    hexagonPoints.append(adsk.core.Point3D.create(x, y+y_shift, -connectorDiameter/2))
+
+                # Add sketch points for hexagon vertices
+                sketchPoints = sketchbhex.sketchPoints
+                
+                for point in hexagonPoints:
+                    sketchPoints.add(point)
+
+                # Connect the hexagon points with lines
+                for i in range(6):
+                    start_point = hexagonPoints[i]
+                    end_point = hexagonPoints[(i + 1) % 6]  # Wrap around to the first point after the last
+                    sketchbhex.sketchCurves.sketchLines.addByTwoPoints(start_point, end_point)
+                
+                profilehex = sketchbhex.profiles.item(0)
+
+                extInputHole = extrudes.createInput(profilehex, adsk.fusion.FeatureOperations.CutFeatureOperation)
+                holedepth = adsk.core.ValueInput.createByReal(connectorDiameter/4)
+                extInputHole.setDistanceExtent(False, holedepth)
+                holeExtrude = bconnectorComp.component.features.extrudeFeatures.add(extInputHole)
+
+
+                sketchbscrew = sketches.add(xzPlane)
+
+                holecircles = sketchbscrew.sketchCurves.sketchCircles
+                holepoint = adsk.core.Point3D.create((-connectorDiameter*(1/3)), 0, 0)
+                hole = holecircles.addByCenterRadius(holepoint, 0.25)
+
+                profilehole = sketchbscrew.profiles.item(0)
+                extInputScrew = extrudes.createInput(profilehole, adsk.fusion.FeatureOperations.CutFeatureOperation)
+                screwdepth = adsk.core.ValueInput.createByString('-0.25 in')
+                extInputScrew.setDistanceExtent(False, screwdepth)
+                screwExtrude = bconnectorComp.component.features.extrudeFeatures.add(extInputScrew)
+
+
+                #create the circular pattern
+                yAxis = bconnectorComp.component.yConstructionAxis
+                circularPatterns = bconnectorComp.component.features.circularPatternFeatures
+                inputEntities = adsk.core.ObjectCollection.create()
+                inputEntities.add(holeExtrude)
+                inputEntities.add(screwExtrude)
+
+                patternInput = circularPatterns.createInput(inputEntities, yAxis)
+                patternInput.quantity = adsk.core.ValueInput.createByReal(airfoilCount)
+                patternInput.totalAngle = adsk.core.ValueInput.createByString('360 deg')
+                circularPattern = circularPatterns.add(patternInput)
+            
+            def create_top_connector(connectorDiameter,turbineHeight, airfoilCount):
+                # Get the active product
+                product = adsk.core.Application.get().activeProduct
+                # Get the root component of the active design.
+                rootComp = product.rootComponent
+                xzPlane = rootComp.xZConstructionPlane
+                yzPlane = rootComp.yZConstructionPlane
+                tconnectorComp = rootComp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+                tconnectorComp.component.name = "TopConnector"
+                # Create a new sketch on the xz plane.
+                sketches = tconnectorComp.component.sketches
+                sketchtbase = sketches.add(xzPlane)
+
+                hexdia = 0.0575*25.4
+                y_shift = 0.05*25.4
+
+                hexagonPoints = []
+                for i in range(6):
+                    angle_deg = 60 * i - 30  # -30 to start the first point at the top
+                    angle_rad = math.radians(angle_deg)
+                    x = centerPoint.x + (hexdia/2) * math.cos(angle_rad)
+                    y = centerPoint.y + (hexdia/2) * math.sin(angle_rad)
+                    hexagonPoints.append(adsk.core.Point3D.create(x, y, turbineHeight))
+
+                # Add sketch points for hexagon vertices
+                sketchPoints = sketchtbase.sketchPoints
+                
+                for point in hexagonPoints:
+                    sketchPoints.add(point)
+
+                # Connect the hexagon points with lines
+                for i in range(6):
+                    start_point = hexagonPoints[i]
+                    end_point = hexagonPoints[(i + 1) % 6]  # Wrap around to the first point after the last
+                    sketchtbase.sketchCurves.sketchLines.addByTwoPoints(start_point, end_point)
+
+                # Draw a circle with the specified diameter.
+                circles = sketchtbase.sketchCurves.sketchCircles
+                base = circles.addByCenterRadius(adsk.core.Point3D.create(0, 0, turbineHeight), connectorDiameter/2)
+                # Get the profile corresponding to the circle
+                profile = sketchtbase.profiles.item(0)  # Select the first profile
+                # Get extrude features
+                extrudes = tconnectorComp.component.features.extrudeFeatures
+                # Create an extrusion input
+                extInput = extrudes.createInput(profile, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+                # Define the distance for the extrusion
+                distance = adsk.core.ValueInput.createByString('1 in')
+                # Set the distance extent to be single direction
+                extInput.setDistanceExtent(False, distance)
+                # Create the extrusion
+                extrudes.add(extInput)
+
+                sketchthex = sketches.add(yzPlane)
+                hexagonPoints = []
+                for i in range(6):
+                    angle_deg = 60 * i - 30  # -30 to start the first point at the top
+                    angle_rad = math.radians(angle_deg)
+                    x = centerPoint.x + (hexdia/2) * math.sin(angle_rad)
+                    y = centerPoint.y + (hexdia/2) * math.cos(angle_rad)
+                    hexagonPoints.append(adsk.core.Point3D.create(x, y+y_shift+turbineHeight, -(connectorDiameter/2)))
+
+                # Add sketch points for hexagon vertices
+                sketchPoints = sketchthex.sketchPoints
+                
+                for point in hexagonPoints:
+                    sketchPoints.add(point)
+
+                # Connect the hexagon points with lines
+                for i in range(6):
+                    start_point = hexagonPoints[i]
+                    end_point = hexagonPoints[(i + 1) % 6]  # Wrap around to the first point after the last
+                    sketchthex.sketchCurves.sketchLines.addByTwoPoints(start_point, end_point)
+                
+                profilehex = sketchthex.profiles.item(0)
+
+                extInputHole = extrudes.createInput(profilehex, adsk.fusion.FeatureOperations.CutFeatureOperation)
+                holedepth = adsk.core.ValueInput.createByReal(connectorDiameter/4)
+                extInputHole.setDistanceExtent(False, holedepth)
+                holeExtrude = tconnectorComp.component.features.extrudeFeatures.add(extInputHole)
+
+
+                sketchtscrew = sketches.add(xzPlane)
+
+                holecircles = sketchtscrew.sketchCurves.sketchCircles
+                holepoint = adsk.core.Point3D.create((-connectorDiameter*(1/3)), 0, turbineHeight)
+                hole = holecircles.addByCenterRadius(holepoint, 0.25)
+
+                profilehole = sketchtscrew.profiles.item(0)
+                extInputScrew = extrudes.createInput(profilehole, adsk.fusion.FeatureOperations.CutFeatureOperation)
+                screwdepth = adsk.core.ValueInput.createByString('0.25 in')
+                extInputScrew.setDistanceExtent(False, screwdepth)
+                screwExtrude = tconnectorComp.component.features.extrudeFeatures.add(extInputScrew)
+
+
+                #create the circular pattern
+                yAxis = tconnectorComp.component.yConstructionAxis
+                circularPatterns = tconnectorComp.component.features.circularPatternFeatures
+                inputEntities = adsk.core.ObjectCollection.create()
+                inputEntities.add(holeExtrude)
+                inputEntities.add(screwExtrude)
+
+                patternInput = circularPatterns.createInput(inputEntities, yAxis)
+                patternInput.quantity = adsk.core.ValueInput.createByReal(airfoilCount)
+                patternInput.totalAngle = adsk.core.ValueInput.createByString('360 deg')
+                circularPattern = circularPatterns.add(patternInput)      
+            create_bottom_connector(connectorDiameter, airfoilCount)
+            create_top_connector(connectorDiameter, turbineHeight, airfoilCount)
+                
+
+        create_connectors(0.3*24.5, turbineHeight, airfoilCount)
       
     except Exception as e:
         ui = adsk.core.Application.get().userInterface

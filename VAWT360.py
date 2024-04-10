@@ -594,6 +594,22 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
                 hexdia = 0.0575*25.4
                 y_shift = 0.05*25.4
 
+                # Draw a circle with the specified diameter.
+                circles = sketchtbase.sketchCurves.sketchCircles
+                base = circles.addByCenterRadius(adsk.core.Point3D.create(0, 0, turbineHeight), connectorDiameter/2)
+                # Get the profile corresponding to the circle
+                profile = sketchtbase.profiles.item(0)  # Select the first profile
+                # Get extrude features
+                extrudes = tconnectorComp.component.features.extrudeFeatures
+                # Create an extrusion input
+                extInput = extrudes.createInput(profile, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+                # Define the distance for the extrusion
+                distance = adsk.core.ValueInput.createByString('1 in')
+                # Set the distance extent to be single direction
+                extInput.setDistanceExtent(False, distance)
+                # Create the extrusion
+                extrudes.add(extInput)
+
                 hexagonPoints = []
                 for i in range(6):
                     angle_deg = 60 * i - 30  # -30 to start the first point at the top
@@ -614,21 +630,27 @@ def createTurbine(holeDiameter, shaftDiameter, outerDiameter, bladeThickness, bl
                     end_point = hexagonPoints[(i + 1) % 6]  # Wrap around to the first point after the last
                     sketchtbase.sketchCurves.sketchLines.addByTwoPoints(start_point, end_point)
 
-                # Draw a circle with the specified diameter.
-                circles = sketchtbase.sketchCurves.sketchCircles
-                base = circles.addByCenterRadius(adsk.core.Point3D.create(0, 0, turbineHeight), connectorDiameter/2)
-                # Get the profile corresponding to the circle
-                profile = sketchtbase.profiles.item(0)  # Select the first profile
-                # Get extrude features
-                extrudes = tconnectorComp.component.features.extrudeFeatures
-                # Create an extrusion input
-                extInput = extrudes.createInput(profile, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+                profileshaft = sketchtbase.profiles.item(1)
+
+                extInputHex = extrudes.createInput(profileshaft, adsk.fusion.FeatureOperations.CutFeatureOperation)
                 # Define the distance for the extrusion
-                distance = adsk.core.ValueInput.createByString('1 in')
+                distance = adsk.core.ValueInput.createByString('0.75 in')
                 # Set the distance extent to be single direction
-                extInput.setDistanceExtent(False, distance)
+                extInputHex.setDistanceExtent(False, distance)
                 # Create the extrusion
-                extrudes.add(extInput)
+                extrudes.add(extInputHex)
+
+                topscrew = circles.addByCenterRadius(adsk.core.Point3D.create(0, 0, turbineHeight+(0.1*25.4)), 0.25)
+                profiletop = sketchtbase.profiles.item(0)
+
+                extInputTop = extrudes.createInput(profiletop, adsk.fusion.FeatureOperations.CutFeatureOperation)
+                # Define the distance for the extrusion
+                distance = adsk.core.ValueInput.createByString('-0.25 in')
+                # Set the distance extent to be single direction
+                extInputTop.setDistanceExtent(False, distance)
+                # Create the extrusion
+                extrudes.add(extInputTop)
+
 
                 sketchthex = sketches.add(yzPlane)
                 hexagonPoints = []

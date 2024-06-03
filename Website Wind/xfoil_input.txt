@@ -1,0 +1,11 @@
+
+LOAD naca0015.dat
+PANE
+OPER
+VISC 619942.4792957292
+ITER 200
+ASEQ -5 15 0.5
+PACC
+results.txt
+
+Pquit

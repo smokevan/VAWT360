@@ -1,12 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Wind Speed Result</title>
+    <title>Wind Data Results</title>
 </head>
 <body>
-    <h1>Current Wind Speed in {{ location }}</h1>
-    <p>The current wind speed is: {{ wind_speed }}</p>
-    <a href="/">Check Another Location</a>
+    <h1>Results for {{ location }}</h1>
+    <p>The yearly average wind speed is: {{ wind_speed }} m/s</p>
+    <p>The yearly average air density is: {{ air_density }} kg/m³</p>
+    <p>The Reynolds number is: {{ reynolds_number }}</p>
+    <h2>XFOIL Results:</h2>
+    <pre>{{ xfoil_results }}</pre>
+    <br>
+    <a href="/">Back to Home</a>
 </body>
 </html>

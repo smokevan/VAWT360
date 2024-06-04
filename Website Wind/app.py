@@ -1,9 +1,10 @@
 import requests
 import datetime
 from flask import Flask, render_template, request
-import subprocess
+import wexpect
 import os
 import re 
+
 
 # Ensure the API key is correctly copied and placed here
 api_key = '0ada37d5339bccddde9ea598c7ac93b9'
@@ -123,23 +124,16 @@ def calculate_reynolds_number(wind_speed, characteristic_length, air_density):
 
 
 
-def send_command(proc, command):
-    """Send a command to XFOIL and wait for it to complete."""
-    print(f"Sending command: {command.strip()}")
-    proc.stdin.write(command + '\r\n')
-    proc.stdin.flush()
-
-    while True:
-        output = proc.stdout.readline().strip()
-        if output:
-            print(f"XFOIL: {output}")
-        if 'c>' in output or '>' in output:
-            break
 
 def run_xfoil_simulation(reynolds_number):
     xfoil_path = r"C:\Users\tgoldberg\Documents\GitHub\VAWT360\Website Wind\XFOIL6.99\xfoil.exe"  # Adjust this path to your XFOIL installation
+    print(f"XFOIL path: {xfoil_path}")
     if not os.path.exists(xfoil_path):
         raise FileNotFoundError(f"XFOIL executable not found at: {xfoil_path}")
+    try:
+        child = wexpect.spawn(xfoil_path)
+    except Exception as e:
+        raise RuntimeError(f"Failed to start XFOIL: {e}")
     
     commands = [
         "naca 0015",
@@ -152,40 +146,21 @@ def run_xfoil_simulation(reynolds_number):
         "QUIT"
     ]
 
-    with subprocess.Popen([xfoil_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, bufsize=1) as proc:
+    try:
         for command in commands:
-            send_command(proc, command)
+            print(f"Sending command: {command}")
+            child.sendline(command)
+            child.expect('>')
 
-        stdout, stderr = proc.communicate()
-        if stderr:
-            print("XFOIL stderr:", stderr)
-        if stdout:
-            print("XFOIL stdout:", stdout)
+        child.close()
 
         if not os.path.exists("results.txt"):
             raise FileNotFoundError("XFOIL did not create the results file.")
 
         with open("results.txt", "r") as file:
             return file.read()
-
-    xfoil_path = r"C:\Users\tgoldberg\Documents\GitHub\VAWT360\Website Wind\XFOIL6.99\xfoil.exe" #path location of xfoil
-    try:
-        process = subprocess.run([xfoil_path], input=xfoil_commands, text=True, capture_output=True)
-        print(f"XFOIL stdout: {process.stdout}")
-        print(f"XFOIL stderr: {process.stderr}")
-        
-        if process.returncode == 0:
-            if os.path.exists("autoPolarDump.txt"):
-                with open("autoPolarDump.txt", "r") as file:
-                    xfoil_results = file.read()
-                return xfoil_results
-            else:
-                return "XFOIL simulation completed, but no results file found."
-        else:
-            return f"XFOIL simulation failed with return code {process.returncode}."
     except Exception as e:
-        return f"XFOIL simulation exception: {str(e)}"
-
+        raise RuntimeError(f"XFOIL command execution failed: {e}")
 
 app = Flask(__name__)
 @app.route('/')
